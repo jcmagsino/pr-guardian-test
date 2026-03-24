@@ -1,0 +1,50 @@
+name: PR Guardian (AI Disclosure)
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  guardian:
+    name: PR Guardian / AI Disclosure
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate AI Usage Disclosure in PR body
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BODY='${{ github.event.pull_request.body }}'
+
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          # ---- Rule 1: Must contain the section header (basic presence) ----
+          echo "$BODY" | grep -qi "AI Usage Disclosure" || \
+            fail "Missing 'AI Usage Disclosure' section in PR description."
+
+          # ---- Rule 2: Must have at least 1 checkbox ticked for 'Where did you use Copilot?' ----
+          echo "$BODY" | grep -Eqi "\- \[[xX]\].*(Business logic|Unit tests|Documentation|Refactoring|PR description|Code comments|Data mappings)" || \
+            fail "No checkbox selected under 'Where did you use Copilot?'. Tick at least one."
+
+          # ---- Rule 3: Must have at least 1 checkbox ticked for Copilot mode ----
+          echo "$BODY" | grep -Eqi "\- \[[xX]\].*(Agent|Edit|Ask)" || \
+            fail "No checkbox selected under 'Which Copilot mode(s) were used?'. Tick at least one."
+
+          # ---- Rule 4: Must include a prompt link that is not the placeholder ----
+          # This looks for something that resembles a URL (http/https) or an internal link.
+          echo "$BODY" | grep -Eqi "(https?://|www\.)" || \
+            fail "Missing prompt link. Add a URL under 'Link to the main prompt(s)'."
+
+          # Optional stricter rule: fail if user leaves the placeholder text
+          echo "$BODY" | grep -qi "<PASTE LINK HERE>" && \
+            fail "Prompt link placeholder still present. Replace '<PASTE LINK HERE>' with the real link."
+
+          echo "✅ PR Guardian passed."
