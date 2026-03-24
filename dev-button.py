@@ -6,3 +6,6 @@ def alphabet_sum(text):
 
     print(total)
     return total
+
+test = input('Input text: ')
+alphabet_sum(test)
