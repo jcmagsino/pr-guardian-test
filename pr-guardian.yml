@@ -26,25 +26,43 @@ jobs:
             exit 1
           }
 
-          # ---- Rule 1: Must contain the section header (basic presence) ----
+          # ---- Rule 1: Section must exist ----
           echo "$BODY" | grep -qi "AI Usage Disclosure" || \
-            fail "Missing 'AI Usage Disclosure' section in PR description."
+            fail "Missing 'AI Usage Disclosure' section."
 
-          # ---- Rule 2: Must have at least 1 checkbox ticked for 'Where did you use Copilot?' ----
+          # ---- Rule 2: At least 1 Copilot usage checkbox ticked ----
           echo "$BODY" | grep -Eqi "\- \[[xX]\].*(Business logic|Unit tests|Documentation|Refactoring|PR description|Code comments|Data mappings)" || \
-            fail "No checkbox selected under 'Where did you use Copilot?'. Tick at least one."
+            fail "No checkbox selected under 'Where did you use Copilot?'."
 
-          # ---- Rule 3: Must have at least 1 checkbox ticked for Copilot mode ----
+          # ---- Rule 3: At least 1 Copilot mode selected ----
           echo "$BODY" | grep -Eqi "\- \[[xX]\].*(Agent|Edit|Ask)" || \
-            fail "No checkbox selected under 'Which Copilot mode(s) were used?'. Tick at least one."
+            fail "No checkbox selected under 'Which Copilot mode(s) were used?'."
 
-          # ---- Rule 4: Must include a prompt link that is not the placeholder ----
-          # This looks for something that resembles a URL (http/https) or an internal link.
-          echo "$BODY" | grep -Eqi "(https?://|www\.)" || \
-            fail "Missing prompt link. Add a URL under 'Link to the main prompt(s)'."
+          # ---- Rule 4: Copilot Credit usage must be numeric ----
+          CREDIT_LINE=$(echo "$BODY" | grep -i "Copilot Credits Used:" || true)
 
-          # Optional stricter rule: fail if user leaves the placeholder text
-          echo "$BODY" | grep -qi "<PASTE LINK HERE>" && \
-            fail "Prompt link placeholder still present. Replace '<PASTE LINK HERE>' with the real link."
+          [[ -z "$CREDIT_LINE" ]] && fail "Missing 'Copilot Credits Used' value."
+
+          CREDIT_VALUE=$(echo "$CREDIT_LINE" | sed -E 's/.*Copilot Credits Used:[[:space:]]*//')
+
+          echo "$CREDIT_VALUE" | grep -Eq '^[0-9]+$' || \
+            fail "Copilot Credits Used must be a numeric value."
+
+          # ---- Rule 5: Prompt must be provided (non-empty, not placeholder, not link) ----
+          PROMPT_BLOCK=$(echo "$BODY" | awk '/Prompt:/,0' | sed '1d')
+
+          [[ -z "$PROMPT_BLOCK" ]] && fail "Missing prompt content."
+
+          echo "$PROMPT_BLOCK" | grep -q "<PASTE" && \
+            fail "Prompt placeholder detected. Replace with actual prompt."
+
+          echo "$PROMPT_BLOCK" | grep -Eqi "(https?://|www\.)" && \
+            fail "Prompt must be text only. Links are not allowed."
+
+          # optional: minimal length check (prevents 1-word inputs)
+          PROMPT_LENGTH=$(echo "$PROMPT_BLOCK" | wc -c)
+
+          [ "$PROMPT_LENGTH" -lt 20 ] && \
+            fail "Prompt content is too short. Please paste the actual prompt."
 
           echo "✅ PR Guardian passed."
