@@ -1,4 +1,4 @@
-## SECTION A — AI Usage Disclosure (Required)
+## AI Usage Disclosure (Required)
 
 ### 1) Where did you use Copilot?
 - [ ] Business logic
